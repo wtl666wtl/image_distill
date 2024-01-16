@@ -1,4 +1,5 @@
 from sampler import get_samples
+from models import model_dict
 from torch.utils.data import Dataset
 import argparse
 import pickle
@@ -18,6 +19,10 @@ class ImgDataset(Dataset):
 
 def load_model(path):
     # TODO
+    # path should be model name
+    # see usage in models/_init_.py
+    model = model_dict[path](num_classes=100)
+    return model
     ...
 
 
