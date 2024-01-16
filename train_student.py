@@ -8,6 +8,7 @@ import os
 import argparse
 import socket
 import time
+import pickle
 
 import tensorboard_logger as tb_logger
 import torch
@@ -150,11 +151,13 @@ def main():
     logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
 
     # dataloader
-
     if opt.add_dataset is not None:
-        # TODO (sipeng): please load_add_data()
-        train_dataset_add = load_add_data(opt.add_dataset)
+        with open(opt.add_dataset, 'rb') as f:
+            train_dataset_add = pickle.load(f)
         n_data_add = len(train_dataset_add)
+    else:
+        train_dataset_add = None
+        n_data_add = 0
 
     # TODO: need to write an additional version for crd, but not now
     if opt.dataset == 'cifar100':

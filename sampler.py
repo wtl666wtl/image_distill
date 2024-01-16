@@ -38,7 +38,7 @@ def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
                 threshold=0.5, input_size=(128, 3, 32, 32), steps=64, device='cuda'):
 
     # the final num of samples should be sample_num_per_class * class_num * threshold
-    # the output is constructed as a 2-dim array [class_num, sample_num_per_class * threshold]
+    # the output is constructed as a 1-dim array and every element is a tuple (img, label)
     # in sample.py please make sure you give the same input_size as the original data!!!
 
     print("Start sampling...")
