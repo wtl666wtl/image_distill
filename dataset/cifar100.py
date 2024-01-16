@@ -3,7 +3,7 @@ from __future__ import print_function
 import os
 import socket
 import numpy as np
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 from PIL import Image
 
@@ -44,7 +44,23 @@ class CIFAR100Instance(datasets.CIFAR100):
         return img, target, index
 
 
-def get_cifar100_dataloaders(batch_size=128, num_workers=8, is_instance=False):
+class CombinedDataset(Dataset):
+    def __init__(self, dataset1, dataset2):
+        self.dataset1 = dataset1
+        self.dataset2 = dataset2
+
+    def __len__(self):
+        return len(self.dataset1) + len(self.dataset2)
+
+    def __getitem__(self, idx):
+        if idx < len(self.dataset1):
+            return self.dataset1[idx]
+        else:
+            return self.dataset2[idx - len(self.dataset1)]
+
+
+def get_cifar100_dataloaders(batch_size=128, num_workers=8, is_instance=False,
+                             train_dataset_add=None, n_data_add=0):
     """
     cifar 100
     """
@@ -66,16 +82,24 @@ def get_cifar100_dataloaders(batch_size=128, num_workers=8, is_instance=False):
                                      download=True,
                                      train=True,
                                      transform=train_transform)
-        n_data = len(train_set)
+        n_data = len(train_set) + n_data_add
     else:
         train_set = datasets.CIFAR100(root=data_folder,
                                       download=True,
                                       train=True,
                                       transform=train_transform)
-    train_loader = DataLoader(train_set,
-                              batch_size=batch_size,
-                              shuffle=True,
-                              num_workers=num_workers)
+
+    if n_data_add > 0:
+        combined_dataset = CombinedDataset(train_set, train_dataset_add)
+        train_loader = DataLoader(combined_dataset,
+                                  batch_size=batch_size,
+                                  shuffle=True,
+                                  num_workers=num_workers)
+    else:
+        train_loader = DataLoader(train_set,
+                                  batch_size=batch_size,
+                                  shuffle=True,
+                                  num_workers=num_workers)
 
     test_set = datasets.CIFAR100(root=data_folder,
                                  download=True,

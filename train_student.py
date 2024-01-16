@@ -55,6 +55,7 @@ def parse_option():
 
     # dataset
     parser.add_argument('--dataset', type=str, default='cifar100', choices=['cifar100'], help='dataset')
+    parser.add_argument('--add_dataset', type=str, default=None, help='additional dataset')
 
     # model
     parser.add_argument('--model_s', type=str, default='resnet8',
@@ -149,6 +150,13 @@ def main():
     logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
 
     # dataloader
+
+    if opt.add_dataset is not None:
+        # TODO (sipeng): please load_add_data()
+        train_dataset_add = load_add_data(opt.add_dataset)
+        n_data_add = len(train_dataset_add)
+
+    # TODO: need to write an additional version for crd, but not now
     if opt.dataset == 'cifar100':
         if opt.distill in ['crd']:
             train_loader, val_loader, n_data = get_cifar100_dataloaders_sample(batch_size=opt.batch_size,
@@ -158,7 +166,9 @@ def main():
         else:
             train_loader, val_loader, n_data = get_cifar100_dataloaders(batch_size=opt.batch_size,
                                                                         num_workers=opt.num_workers,
-                                                                        is_instance=True)
+                                                                        is_instance=True,
+                                                                        train_dataset_add=train_dataset_add,
+                                                                        n_data_add=n_data_add)
         n_cls = 100
     else:
         raise NotImplementedError(opt.dataset)
