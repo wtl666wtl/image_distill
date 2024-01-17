@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+from tqdm import tqdm
+
 
 class LangevinSampler(nn.Module):
     def __init__(self, n_steps=1, step_size=0.2, sigma=0.1, device='cuda'):
@@ -46,7 +48,7 @@ def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
     sampler = LangevinSampler(n_steps=1, sigma=1e-1, step_size=5e-3, device=device)
     genrated_data = []
 
-    for cls in range(class_num):
+    for cls in tqdm(range(class_num)):
         cnt = 0
         sample_pairs = []
         while cnt < sample_num_per_class:
@@ -77,19 +79,23 @@ def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
                 input = sampler.step(input, s_model, t_model, cls)
                 img_per_step.append(input.clone().detach())
 
+                """
+                # debug
                 if _ % 8 == 0:
                     with torch.no_grad():
                         s_output = s_model(input)
                         t_output = t_model(input)
+                        s_out = s_output.softmax(dim=-1)
+                        t_out = t_output.softmax(dim=-1)
                         print(s_output[:1, cls], t_output[:1, cls])
+                        print(s_out[:1, cls], t_out[:1, cls])
+                """
 
-            # TODO (not important): print the output for debugging
             with torch.no_grad():
                 s_output = s_model(input)
                 t_output = t_model(input)
                 s_out = s_output.softmax(dim=-1)
                 t_out = t_output.softmax(dim=-1)
-                print(s_output[:1, cls], t_output[:1, cls])
 
             for i in range(input_size[0]):
                 # TODO (after the first stage): add entropy or some other things to improve quality

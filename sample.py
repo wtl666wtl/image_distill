@@ -80,13 +80,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='data sampling')
     parser.add_argument('--path_t', default='./save/models/resnet32x4_vanilla/ckpt_epoch_240.pth',
                         help='teacher model path')
-    parser.add_argument('--path_s', default='./save/student_model/S:resnet8x4_T:resnet32x4_cifar100_kd_r:0.1_a:0.9_b:0.0_1/ckpt_epoch_40.pth',
+    parser.add_argument('--path_s', default='./save/student_model/S:resnet8x4_T:resnet32x4_cifar100_kd_r:0.1_a:0.9_b:0.0_1/ckpt_epoch_240.pth',
                         help='student model path')
     parser.add_argument('--output_path', default='add_data/cifar-100/train_dataset_add.pkl',
                         help='generated data path')
     parser.add_argument('--class_num', default=100, type=int,
                         help='number of classes')
-    parser.add_argument('--sample_num_per_class', default=100, type=int,
+    parser.add_argument('--sample_num_per_class', default=1000, type=int,
                         help='number of samples per class')
     parser.add_argument('--threshold', default=0.5, type=float,
                         help='only consider the samples with high values')
