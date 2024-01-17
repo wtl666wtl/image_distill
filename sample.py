@@ -1,3 +1,5 @@
+import os
+
 from sampler import get_samples
 from models import model_dict
 from torch.utils.data import Dataset
@@ -55,7 +57,8 @@ def load_s(model_path, n_cls):
 
 def store_data(data, output_path):
     dataset = ImgDataset(data)
-    with open(output_path, 'wb') as f:
+    os.system("mkdir -p {}".format(output_path))
+    with open(output_path + "/train_dataset_add.pkl", 'wb') as f:
         pickle.dump(dataset, f)
 
 
@@ -82,7 +85,7 @@ if __name__ == '__main__':
                         help='teacher model path')
     parser.add_argument('--path_s', default='./save/student_model/S:resnet8x4_T:resnet32x4_cifar100_kd_r:0.1_a:0.9_b:0.0_1/ckpt_epoch_240.pth',
                         help='student model path')
-    parser.add_argument('--output_path', default='add_data/cifar-100/train_dataset_add.pkl',
+    parser.add_argument('--output_path', default='./add_data/cifar-100',
                         help='generated data path')
     parser.add_argument('--class_num', default=100, type=int,
                         help='number of classes')
