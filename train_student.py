@@ -32,6 +32,18 @@ from crd.criterion import CRDLoss
 from helper.loops import train_distill as train, validate
 from helper.pretrain import init
 
+from torch.utils.data import Dataset
+class ImgDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img, label = self.data[idx]
+        return img, label, idx
+
 
 def parse_option():
 
