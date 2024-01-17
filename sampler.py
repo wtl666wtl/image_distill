@@ -35,7 +35,7 @@ class LangevinSampler(nn.Module):
 
 
 def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
-                threshold=0.5, input_size=(128, 3, 32, 32), steps=64, device='cuda'):
+                threshold=0.5, input_size=(128, 3, 32, 32), steps=128, device='cuda'):
 
     # the final num of samples should be sample_num_per_class * class_num * threshold
     # the output is constructed as a 1-dim array and every element is a tuple (img, label)
@@ -43,7 +43,7 @@ def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
 
     print("Start sampling...")
     s_model.eval()
-    sampler = LangevinSampler(n_steps=1, sigma=1e-1, step_size=5e-4, device=device)
+    sampler = LangevinSampler(n_steps=1, sigma=1e-1, step_size=5e-3, device=device)
     genrated_data = []
 
     for cls in range(class_num):
@@ -54,15 +54,20 @@ def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
 
             # create initial noisy picture
             input = torch.randint(0, 256, input_size, device=device, dtype=torch.uint8)
-            # TODO: add this line if having bugs
-            # input = transforms.ToPILImage()(input)
             train_transform = transforms.Compose([
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
             ])
-            input = train_transform(input)
+
+            transformed_images = []
+            for img in input:
+                pil_img = transforms.ToPILImage()(img)
+                transformed_img = train_transform(pil_img)
+                transformed_images.append(transformed_img.unsqueeze(0))
+
+            input = torch.cat(transformed_images).to(device)
 
             # start sampling
             torch.set_grad_enabled(True)  # Tracking gradients for sampling necessary
@@ -72,19 +77,26 @@ def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
                 input = sampler.step(input, s_model, t_model, cls)
                 img_per_step.append(input.clone().detach())
 
+                if _ % 8 == 0:
+                    with torch.no_grad():
+                        s_output = s_model(input)
+                        t_output = t_model(input)
+                        print(s_output[:1, cls], t_output[:1, cls])
+
             # TODO (not important): print the output for debugging
             with torch.no_grad():
                 s_output = s_model(input)
                 t_output = t_model(input)
                 s_out = s_output.softmax(dim=-1)
                 t_out = t_output.softmax(dim=-1)
+                print(s_output[:1, cls], t_output[:1, cls])
 
             for i in range(input_size[0]):
                 # TODO (after the first stage): add entropy or some other things to improve quality
                 sample_pairs.append((abs(t_out[i, cls].item() - s_out[i, cls].item()), input[i]))
 
         sorted_pairs = sorted(sample_pairs, reverse=True)
-        sorted_pairs = sorted_pairs[:sample_num_per_class * threshold]
+        sorted_pairs = sorted_pairs[:int(sample_num_per_class * threshold)]
         for val, img in sorted_pairs:
             genrated_data.append((img.cpu().detach(), cls))
 
