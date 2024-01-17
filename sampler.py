@@ -36,7 +36,7 @@ class LangevinSampler(nn.Module):
         return tmp_input
 
 
-def get_samples(t_model, s_model, class_num=100, sample_num_per_class=10000,
+def get_samples(t_model, s_model, class_num=100, sample_num_per_class=1000,
                 threshold=0.5, input_size=(128, 3, 32, 32), steps=128, device='cuda'):
 
     # the final num of samples should be sample_num_per_class * class_num * threshold

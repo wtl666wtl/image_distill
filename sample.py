@@ -86,13 +86,13 @@ if __name__ == '__main__':
                         help='generated data path')
     parser.add_argument('--class_num', default=100, type=int,
                         help='number of classes')
-    parser.add_argument('--sample_num_per_class', default=1000, type=int,
+    parser.add_argument('--sample_num_per_class', default=625, type=int,
                         help='number of samples per class')
-    parser.add_argument('--threshold', default=0.5, type=float,
+    parser.add_argument('--threshold', default=0.8, type=float,
                         help='only consider the samples with high values')
-    parser.add_argument('--input_size', default=(128, 3, 32, 32), type=tuple,
+    parser.add_argument('--input_size', default=(64, 3, 32, 32), type=tuple,
                         help='input image size')
-    parser.add_argument('--steps', default=128, type=int,
+    parser.add_argument('--steps', default=64, type=int,
                         help='sampling steps')
 
     args = parser.parse_args()
