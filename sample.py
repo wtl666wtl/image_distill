@@ -2,6 +2,7 @@ import os
 
 from sampler import get_samples
 from models import model_dict
+from dataset.cifar100 import get_cifar100_dataloaders_cls
 from torch.utils.data import Dataset
 import argparse
 import pickle
@@ -63,15 +64,16 @@ def store_data(data, output_path):
 
 
 def main(args):
-    # TODO: first load teacher and student from the path
     # you can first try to solve one t/s pair like (t: wrn-40-2, s: wrn-16-2)
     t_model = load_t(args.path_t, args.class_num)
     t_model = t_model.to('cuda')
     s_model = load_s(args.path_s, args.class_num)
     s_model = s_model.to('cuda')
 
+    train_loader = get_cifar100_dataloaders_cls(batch_size=args.input_size[0])
+
     # call sampler to generate data
-    data = get_samples(t_model, s_model, args.class_num,
+    data = get_samples(t_model, s_model, train_loader, args.class_num,
                        args.sample_num_per_class, args.threshold,
                        args.input_size, args.steps)
 
@@ -85,6 +87,8 @@ if __name__ == '__main__':
                         help='teacher model path')
     parser.add_argument('--path_s', default='./save/student_model/S:resnet8x4_T:resnet32x4_cifar100_kd_r:0.1_a:0.9_b:0.0_1/ckpt_epoch_240.pth',
                         help='student model path')
+    parser.add_argument('--data', default='cifar-100',
+                        help='dataset')
     parser.add_argument('--output_path', default='./add_data/cifar-100',
                         help='generated data path')
     parser.add_argument('--class_num', default=100, type=int,

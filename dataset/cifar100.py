@@ -3,7 +3,7 @@ from __future__ import print_function
 import os
 import socket
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 from torchvision import datasets, transforms
 from PIL import Image
 
@@ -235,3 +235,35 @@ def get_cifar100_dataloaders_sample(batch_size=128, num_workers=8, k=4096, mode=
                              num_workers=int(num_workers/2))
 
     return train_loader, test_loader, n_data
+
+
+
+
+def get_cifar100_dataloaders_cls(batch_size=128, num_workers=8):
+    """
+    cifar 100 (split by cls)
+    """
+    data_folder = get_data_folder()
+
+    train_transform = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+    ])
+
+    train_set = CIFAR100Instance(root=data_folder,
+                                 download=True,
+                                 train=True,
+                                 transform=train_transform)
+
+    indices_per_label = {label: [] for label in range(100)}
+    for idx, (_, label, index) in enumerate(train_set):
+        indices_per_label[label].append(idx)
+
+    datasets_per_label = [Subset(train_set, indices_per_label[label]) for label in range(100)]
+
+    train_loader_per_label = [DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers) for
+                             dataset in datasets_per_label]
+
+    return train_loader_per_label
