@@ -261,7 +261,7 @@ def get_cifar100_dataloaders_cls(batch_size=128, num_workers=8):
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        AddGaussianNoise(0., 0.075),
+        AddGaussianNoise(0., 0.2),
         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
     ])
 
