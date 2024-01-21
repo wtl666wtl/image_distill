@@ -117,7 +117,9 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
             feat_t = [f.detach() for f in feat_t]
 
         # cls + kl div
-        loss_cls = criterion_cls(logit_s, target)
+        mask = index < 50000
+        import torch.nn.functional as F
+        loss_cls = (F.cross_entropy(logit_s, target, reduction='none') * mask).mean()
         loss_div = criterion_div(logit_s, logit_t)
 
         # other kd beyond KL divergence

@@ -56,7 +56,8 @@ class CombinedDataset(Dataset):
         if idx < len(self.dataset1):
             return self.dataset1[idx]
         else:
-            return self.dataset2[idx - len(self.dataset1)]
+            img, target, index = self.dataset2[idx - len(self.dataset1)]
+            return img, target, index + len(self.dataset1)
 
 
 def get_cifar100_dataloaders(batch_size=128, num_workers=8, is_instance=False,
@@ -236,6 +237,17 @@ def get_cifar100_dataloaders_sample(batch_size=128, num_workers=8, k=4096, mode=
 
     return train_loader, test_loader, n_data
 
+import torch
+class AddGaussianNoise(object):
+    def __init__(self, mean=0., std=1.):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        return tensor + torch.randn(tensor.size()) * self.std + self.mean
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 
 
@@ -249,6 +261,7 @@ def get_cifar100_dataloaders_cls(batch_size=128, num_workers=8):
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
+        AddGaussianNoise(0., 0.075),
         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
     ])
 

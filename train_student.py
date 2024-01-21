@@ -61,8 +61,9 @@ def parse_option():
     parser.add_argument('--init_epochs', type=int, default=30, help='init training for two-stage methods')
 
     # optimization
-    parser.add_argument('--learning_rate', type=float, default=0.05, help='learning rate')
+    #parser.add_argument('--learning_rate', type=float, default=0.05, help='learning rate')
     #parser.add_argument('--lr_decay_epochs', type=str, default='150,180,210', help='where to decay lr, can be a list')
+    parser.add_argument('--learning_rate', type=float, default=0.05, help='learning rate')
     parser.add_argument('--lr_decay_epochs', type=str, default='25,40,55', help='where to decay lr, can be a list')
     parser.add_argument('--lr_decay_rate', type=float, default=0.1, help='decay rate for learning rate')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='weight decay')
@@ -79,7 +80,7 @@ def parse_option():
                                  'vgg8', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'ResNet50',
                                  'MobileNetV2', 'ShuffleV1', 'ShuffleV2'])
     parser.add_argument('--path_t', type=str, default=None, help='teacher model snapshot')
-
+    parser.add_argument('--path_s', type=str, default=None, help='student model snapshot')
     # distillation
     parser.add_argument('--distill', type=str, default='kd', choices=['kd', 'hint', 'attention', 'similarity',
                                                                       'correlation', 'vid', 'crd', 'kdsvd', 'fsp',
@@ -156,6 +157,24 @@ def load_teacher(model_path, n_cls):
     return model
 
 
+def get_student_name(model_path):
+    """parse student name"""
+    segments = model_path.split('/')[-2].split('_')
+    if segments[0] != 'S:wrn':
+        return segments[0][2:]
+    else:
+        return segments[0][2:] + '_' + segments[1] + '_' + segments[2]
+
+
+def load_student(model_path, n_cls):
+    print('==> loading student model')
+    model_t = get_student_name(model_path)
+    model = model_dict[model_t](num_classes=n_cls)
+    model.load_state_dict(torch.load(model_path)['model'])
+    print('==> done')
+    return model
+
+
 def main():
     best_acc = 0
 
@@ -192,7 +211,11 @@ def main():
 
     # model
     model_t = load_teacher(opt.path_t, n_cls)
-    model_s = model_dict[opt.model_s](num_classes=n_cls)
+
+    if opt.path_s is not None:
+        model_s = load_student(opt.path_s, n_cls)
+    else:
+        model_s = model_dict[opt.model_s](num_classes=n_cls)
 
     data = torch.randn(2, 3, 32, 32)
     model_t.eval()
@@ -313,6 +336,11 @@ def main():
     # validate teacher accuracy
     teacher_acc, _, _ = validate(val_loader, model_t, criterion_cls, opt)
     print('teacher accuracy: ', teacher_acc)
+
+    # validate student accuracy
+    if opt.path_s is not None:
+        student_acc, _, _ = validate(val_loader, model_s, criterion_cls, opt)
+        print('student accuracy: ', student_acc)
 
     # routine
     for epoch in range(1, opt.epochs + 1):

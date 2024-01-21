@@ -132,10 +132,10 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
                 s_out = s_output.softmax(dim=-1)
                 t_out = t_output.softmax(dim=-1)
 
-            # print(s_out[:10, cls], t_out[:10, cls])
+            #print(s_out[:10, cls], t_out[:10, cls])
 
-            #if cls == 0 and cnt == input_size[0]:
-            #    output(s_out, t_out, input)
+            if cls == 0 and cnt == input_size[0]:
+                output(s_out, t_out, input)
 
             for i in range(input_size[0]):
                 # TODO (after the first stage): add entropy or some other things to improve quality

@@ -30,7 +30,7 @@ def get_teacher_name(model_path):
 
 
 def get_student_name(model_path):
-    """parse teacher name"""
+    """parse student name"""
     segments = model_path.split('/')[-2].split('_')
     if segments[0] != 'S:wrn':
         return segments[0][2:]
