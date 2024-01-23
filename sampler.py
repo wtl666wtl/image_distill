@@ -6,12 +6,36 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
+import torch.nn.functional as F
 
 
 def denormalize(tensor, mean, std):
     mean = torch.tensor(mean).unsqueeze(1).unsqueeze(1).to('cuda')
     std = torch.tensor(std).unsqueeze(1).unsqueeze(1).to('cuda')
     return tensor * std + mean
+
+
+def random_sample(input, input_size):
+    new_input = torch.zeros_like(input)
+    random_indices = torch.randint(0, 4, (input_size[0], input_size[2], input_size[3]))
+    #random_indices = torch.randint(0, input_size[0], (input_size[0], input_size[2], input_size[3]))
+    for i in range(input_size[0]):
+        for h in range(input_size[2]):
+            for w in range(input_size[3]):
+                selected_image_idx = random_indices[i, h, w]
+                new_input[i, 0, h, w] = input[selected_image_idx, 0, h, w]
+                new_input[i, 1, h, w] = input[selected_image_idx, 1, h, w]
+                new_input[i, 2, h, w] = input[selected_image_idx, 2, h, w]
+
+    normalizer = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+    transformed_images = []
+    for img in new_input:
+        # pil_img = transforms.ToPILImage()(img)
+        transformed_img = normalizer(img)
+        transformed_images.append(transformed_img.unsqueeze(0))
+
+    new_input = torch.cat(transformed_images).to('cuda')
+    return new_input
 
 
 def output(s_out, t_out, input): # visualize
@@ -40,9 +64,13 @@ class LangevinSampler(nn.Module):
 
     def get_grad(self, input, s_out, t_out, sample_label):
         grad_s = torch.autograd.grad(s_out[:, sample_label].sum(), input, allow_unused=True)[0]
-        grad_y = torch.autograd.grad(t_out[:, sample_label].sum(), input, allow_unused=True)[0]
+        grad_t = torch.autograd.grad(t_out[:, sample_label].sum(), input, allow_unused=True, retain_graph=True)[0]
+        probs = F.softmax(t_out, dim=1)
+        entropy = -torch.sum(probs * torch.log(probs), dim=1).sum()
+        grad_entropy = torch.autograd.grad(entropy, input, allow_unused=True)[0]
         # TODO (after the first stage): add entropy or some other things to improve quality
-        return grad_y.detach() - grad_s.detach()
+        # print(grad_t, grad_s, grad_entropy)
+        return grad_t.detach() - grad_s.detach() + grad_entropy.detach()
 
     def step(self, input, s_model, t_model, sample_label):
 
@@ -88,6 +116,9 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
             cnt += input_size[0]
 
             input, _, _ = next(iter(train_loader[cls]))
+            if False:
+                input = random_sample(input, input_size)
+
             input = input.to(device)
 
             """
@@ -108,12 +139,12 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
             # start sampling
             torch.set_grad_enabled(True)  # Tracking gradients for sampling necessary
 
-            img_per_step = [] # record the result in every step
+            # img_per_step = []
             for _ in range(steps):
                 input = sampler.step(input, s_model, t_model, cls)
-                img_per_step.append(input.clone().detach())
+                # img_per_step.append(input.clone().detach())
 
-                """
+                #"""
                 # debug
                 if _ % 8 == 0:
                     with torch.no_grad():
@@ -122,9 +153,9 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
                         s_out = s_output.softmax(dim=-1)
                         t_out = t_output.softmax(dim=-1)
                         # print(s_output[:1, cls], t_output[:1, cls])
-                        print(_, s_out[:10, cls], t_out[:10, cls])
+                        # print(_, s_out[:10, cls], t_out[:10, cls])
                         #print(_, s_out[:1].argmin(), s_out[:1].min(), t_out[:1].argmax(), t_out[:1].max())
-                """
+                #"""
 
             with torch.no_grad():
                 s_output = s_model(input)
@@ -139,11 +170,13 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
 
             for i in range(input_size[0]):
                 # TODO (after the first stage): add entropy or some other things to improve quality
-                sample_pairs.append((abs(t_out[i, cls].item() - s_out[i, cls].item()), input[i]))
+                entropy = -torch.sum(t_out[i] * torch.log(t_out[i]))
+                # print(abs(t_out[i, cls].item() - s_out[i, cls].item()), entropy)
+                sample_pairs.append((0 * abs(t_out[i, cls].item() - s_out[i, cls].item()) + entropy.item(), cnt-input_size[0]+i, input[i]))
 
         sorted_pairs = sorted(sample_pairs, reverse=True)
         sorted_pairs = sorted_pairs[:int(sample_num_per_class * threshold)]
-        for val, img in sorted_pairs:
+        for val, idx, img in sorted_pairs:
             genrated_data.append((img.cpu().detach(), cls))
 
     return genrated_data
