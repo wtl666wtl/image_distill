@@ -3,7 +3,8 @@ from __future__ import print_function
 import os
 import socket
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Dataset, DataLoader, Subset, ConcatDataset, BatchSampler
+import random
 from torchvision import datasets, transforms
 from PIL import Image
 
@@ -60,6 +61,38 @@ class CombinedDataset(Dataset):
             return img, target, index + len(self.dataset1)
 
 
+class CustomBatchSampler():
+    def __init__(self, dataset1_size, dataset2_size, batch_size, drop_last):
+        self.dataset1_size = dataset1_size
+        self.dataset2_size = dataset2_size
+        self.batch_size = batch_size
+        self.drop_last = drop_last
+
+    def __iter__(self):
+        dataset1_indices = list(range(self.dataset1_size))
+        dataset2_indices = list(range(self.dataset1_size, self.dataset1_size + self.dataset2_size))
+
+        random.shuffle(dataset1_indices)
+        random.shuffle(dataset2_indices)
+
+        combined_indices = []
+        for i in range(0, len(dataset1_indices), self.batch_size):
+            combined_indices.append(dataset1_indices[i:i + self.batch_size])
+        for i in range(0, len(dataset2_indices), self.batch_size):
+            combined_indices.append(dataset2_indices[i:i + self.batch_size])
+
+        random.shuffle(combined_indices)
+
+        for batch_indices in combined_indices:
+            if not self.drop_last or len(batch_indices) == self.batch_size:
+                yield batch_indices
+
+    def __len__(self):
+        if self.drop_last:
+            return (self.dataset1_size // self.batch_size) + (self.dataset2_size // self.batch_size)
+        else:
+            return (self.dataset1_size + self.batch_size - 1) // self.batch_size + (self.dataset2_size + self.batch_size - 1) // self.batch_size
+
 def get_cifar100_dataloaders(batch_size=128, num_workers=8, is_instance=False,
                              train_dataset_add=None, n_data_add=0):
     """
@@ -91,8 +124,12 @@ def get_cifar100_dataloaders(batch_size=128, num_workers=8, is_instance=False,
                                       transform=train_transform)
 
     if n_data_add > 0:
+        #combined_dataset = ConcatDataset([train_set, train_dataset_add])
         combined_dataset = CombinedDataset(train_set, train_dataset_add)
+        #batch_sampler = CustomBatchSampler(len(train_set), len(train_dataset_add), batch_size=batch_size, drop_last=True)
+
         train_loader = DataLoader(combined_dataset,
+                                  #batch_sampler=batch_sampler,
                                   batch_size=batch_size,
                                   shuffle=True,
                                   num_workers=num_workers)
@@ -261,7 +298,7 @@ def get_cifar100_dataloaders_cls(batch_size=128, num_workers=8):
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        AddGaussianNoise(0., 0.2),
+        #AddGaussianNoise(0., 0.2),
         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
     ])
 

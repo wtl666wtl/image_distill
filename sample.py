@@ -73,7 +73,7 @@ def main(args):
     train_loader = get_cifar100_dataloaders_cls(batch_size=args.input_size[0])
 
     # call sampler to generate data
-    data = get_samples(t_model, s_model, train_loader, args.class_num,
+    data = get_samples(t_model, s_model, train_loader, args, args.class_num,
                        args.sample_num_per_class, args.threshold,
                        args.input_size, args.steps)
 
@@ -91,6 +91,8 @@ if __name__ == '__main__':
                         help='dataset')
     parser.add_argument('--output_path', default='./add_data/cifar-100',
                         help='generated data path')
+    parser.add_argument('--distill', default='kd',
+                        help='distillation method')
     parser.add_argument('--class_num', default=100, type=int,
                         help='number of classes')
     parser.add_argument('--sample_num_per_class', default=200, type=int,
@@ -101,6 +103,11 @@ if __name__ == '__main__':
                         help='input image size')
     parser.add_argument('--steps', default=64, type=int,
                         help='sampling steps')
+
+    parser.add_argument('-r', '--gamma', type=float, default=1, help='weight for classification')
+    parser.add_argument('-a', '--alpha', type=float, default=None, help='weight balance for KD')
+    parser.add_argument('-b', '--beta', type=float, default=None, help='weight balance for other losses')
+    parser.add_argument('--kd_T', type=float, default=4, help='temperature for KD distillation')
 
     args = parser.parse_args()
     main(args)
