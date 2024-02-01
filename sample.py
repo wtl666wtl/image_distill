@@ -75,7 +75,7 @@ def main(args):
     # call sampler to generate data
     data = get_samples(t_model, s_model, train_loader, args.class_num,
                        args.sample_num_per_class, args.threshold,
-                       args.input_size, args.steps)
+                       args.input_size, args.steps,args.decay)
 
     # store data into the specific path
     store_data(data, args.output_path)
@@ -101,6 +101,7 @@ if __name__ == '__main__':
                         help='input image size')
     parser.add_argument('--steps', default=64, type=int,
                         help='sampling steps')
+    parser.add_argument('--decay',default=0,type=int,help='sample step size decay period')
 
     args = parser.parse_args()
     main(args)
