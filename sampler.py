@@ -57,11 +57,8 @@ def output(s_out, t_out, input): # visualize
 
 
 class LangevinSampler(nn.Module):
-<<<<<<< HEAD
-    def __init__(self, n_steps=1, step_size=0.2, sigma=0.1 ,device='cuda'):
-=======
+    
     def __init__(self, args, n_steps=1, step_size=0.2, device='cuda'):
->>>>>>> de595eb39139302552c50ed4b718dd2b4907e085
         super().__init__()
         self.n_steps = n_steps
         self.step_size = step_size
@@ -294,13 +291,8 @@ class LangevinSampler(nn.Module):
         return tmp_input
 
 
-<<<<<<< HEAD
 def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_class=1000,
                 threshold=0.5, input_size=(64, 3, 32, 32), steps=64, decay=0,device='cuda'):
-=======
-def get_samples(t_model, s_model, train_loader, args, class_num=100, sample_num_per_class=1000,
-                threshold=0.5, input_size=(64, 3, 32, 32), steps=64, device='cuda'):
->>>>>>> de595eb39139302552c50ed4b718dd2b4907e085
 
     # the final num of samples should be sample_num_per_class * class_num * threshold
     # the output is constructed as a 1-dim array and every element is a tuple (img, label)
@@ -356,34 +348,9 @@ def get_samples(t_model, s_model, train_loader, args, class_num=100, sample_num_
                         s_out = s_output.softmax(dim=-1)
                         t_out = t_output.softmax(dim=-1)
                         # print(s_output[:1, cls], t_output[:1, cls])
-<<<<<<< HEAD
-                        print(_, s_out[:10, cls], t_out[:10, cls])
-                        #print(_, s_out[:1].argmin(), s_out[:1].min(), t_out[:1].argmax(), t_out[:1].max())
-                """
-            #decay step_size
-            if decay!=0:
-                for sps in range(steps):
-                    input=sampler.step(input,s_model,t_model,cls,1)
-                    """
-                    # debug
-                    if sps % 8 == 0:
-                        with torch.no_grad():
-                            s_output = s_model(input)
-                            t_output = t_model(input)
-                            s_out = s_output.softmax(dim=-1)
-                            t_out = t_output.softmax(dim=-1)
-                            # print(s_output[:1, cls], t_output[:1, cls])
-                            print(_, s_out[:10, cls], t_out[:10, cls])
-                            #print(_, s_out[:1].argmin(), s_out[:1].min(), t_out[:1].argmax(), t_out[:1].max())
-                    """
-                    
-            
-            #
-=======
                         # print(_, s_out[:10, cls], t_out[:10, cls])
                         # print(_, s_out[:1].argmin(), s_out[:1].min(), t_out[:1].argmax(), t_out[:1].max())
                 #"""
->>>>>>> de595eb39139302552c50ed4b718dd2b4907e085
 
             with torch.no_grad():
                 s_output = s_model(input)
