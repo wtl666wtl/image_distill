@@ -117,9 +117,25 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
             feat_t = [f.detach() for f in feat_t]
 
         # cls + kl div
+        """
         mask = index < 50000
+        mask_ = index >= 50000
         import torch.nn.functional as F
         loss_cls = (F.cross_entropy(logit_s, target, reduction='none') * mask).mean()
+        p_s = F.log_softmax(logit_s / 4, dim=1)
+        p_t = F.softmax(logit_t / 4, dim=1)
+        kl_div = F.kl_div(p_s, p_t, reduction='none')
+        kl_div_sum = kl_div.sum(dim=1)
+        if mask.sum() > 0:
+            loss_div = (kl_div_sum * mask).sum() * (4 ** 2) / mask.sum()
+        else:
+            loss_div = 0
+        if mask_.sum() > 0:
+            loss_div_ = (kl_div_sum * mask_).sum() * (4 ** 2) / mask_.sum()
+        else:
+            loss_div_ = 0
+        """
+        loss_cls = criterion_cls(logit_s, target)
         loss_div = criterion_div(logit_s, logit_t)
 
         # other kd beyond KL divergence
@@ -183,7 +199,7 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
         else:
             raise NotImplementedError(opt.distill)
 
-        loss = opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd
+        loss = opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd # opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd + (opt.gamma + opt.alpha) * loss_div_
 
         acc1, acc5 = accuracy(logit_s, target, topk=(1, 5))
         losses.update(loss.item(), input.size(0))
@@ -224,6 +240,11 @@ def validate(val_loader, model, criterion, opt):
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    ####
+    # for debug, capture the worst class
+    cls_acc = [[] for _ in range(100)]
+    ####
+
     # switch to evaluate mode
     model.eval()
 
@@ -246,6 +267,10 @@ def validate(val_loader, model, criterion, opt):
             top1.update(acc1[0], input.size(0))
             top5.update(acc5[0], input.size(0))
 
+            """
+            for i in range(len(target)):
+                cls_acc[target[i].item()].append((output[i].argmax()==target[i]).unsqueeze(0))
+            """
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
@@ -261,5 +286,9 @@ def validate(val_loader, model, criterion, opt):
 
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
-
+        """
+        for i in range(100):
+            cls_acc[i] = torch.cat(cls_acc[i]).float().mean()
+        print(cls_acc)
+        """
     return top1.avg, top5.avg, losses.avg
