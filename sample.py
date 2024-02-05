@@ -75,7 +75,7 @@ def main(args):
     # call sampler to generate data
     data = get_samples(t_model, s_model, train_loader, args, args.class_num,
                        args.sample_num_per_class, args.threshold,
-                       args.input_size, args.steps,args.decay)
+                       args.input_size, args.steps)
 
     # store data into the specific path
     store_data(data, args.output_path)
@@ -95,15 +95,14 @@ if __name__ == '__main__':
                         help='distillation method')
     parser.add_argument('--class_num', default=100, type=int,
                         help='number of classes')
-    parser.add_argument('--sample_num_per_class', default=200, type=int,
+    parser.add_argument('--sample_num_per_class', default=100, type=int,
                         help='number of samples per class')
     parser.add_argument('--threshold', default=0.5, type=float,
                         help='only consider the samples with high values')
-    parser.add_argument('--input_size', default=(64, 3, 32, 32), type=tuple,
+    parser.add_argument('--input_size', default=(32, 3, 32, 32), type=tuple,
                         help='input image size')
-    parser.add_argument('--steps', default=64, type=int,
+    parser.add_argument('--steps', default=32, type=int,
                         help='sampling steps')
-    parser.add_argument('--decay',default=0,type=int,help='sample step size decay period')
 
     parser.add_argument('-r', '--gamma', type=float, default=1, help='weight for classification')
     parser.add_argument('-a', '--alpha', type=float, default=None, help='weight balance for KD')

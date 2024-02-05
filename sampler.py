@@ -21,12 +21,14 @@ def denormalize(tensor, mean, std):
 
 def random_sample(input, input_size):
     new_input = torch.zeros_like(input)
-    random_indices = torch.randint(0, 4, (input_size[0], input_size[2], input_size[3]))
-    #random_indices = torch.randint(0, input_size[0], (input_size[0], input_size[2], input_size[3]))
+    random_indices = torch.zeros((input_size[0], input_size[2], input_size[3]))
+    for i in range(input_size[0]):
+        random_indices[i] = torch.randint(i//2*2, i//2*2+2, (input_size[2], input_size[3]))
+    # random_indices = torch.randint(0, input_size[0], (input_size[0], input_size[2], input_size[3]))
     for i in range(input_size[0]):
         for h in range(input_size[2]):
             for w in range(input_size[3]):
-                selected_image_idx = random_indices[i, h, w]
+                selected_image_idx = int(random_indices[i, h, w].item())
                 new_input[i, 0, h, w] = input[selected_image_idx, 0, h, w]
                 new_input[i, 1, h, w] = input[selected_image_idx, 1, h, w]
                 new_input[i, 2, h, w] = input[selected_image_idx, 2, h, w]
@@ -57,7 +59,6 @@ def output(s_out, t_out, input): # visualize
 
 
 class LangevinSampler(nn.Module):
-    
     def __init__(self, args, n_steps=1, step_size=0.2, device='cuda'):
         super().__init__()
         self.n_steps = n_steps
@@ -172,7 +173,7 @@ class LangevinSampler(nn.Module):
         return grad_t.detach() - grad_s.detach() + grad_entropy.detach()
 
 
-    def get_grad(self, input, model_s, model_t, sample_label):
+    def get_grad(self, true_input, input, model_s, model_t, sample_label):
         preact = False
         if self.distill in ['abound']:
             preact = True
@@ -187,7 +188,7 @@ class LangevinSampler(nn.Module):
         criterion_kd = self.criterion_list[2]
 
         target = sample_label * torch.ones(logit_t.shape[0], dtype=torch.long).to(self.device)
-        loss_cls = criterion_cls(logit_s, target)
+        loss_cls = criterion_cls(logit_s, target) - criterion_cls(logit_t, target)
         loss_div = criterion_div(logit_s, logit_t)
 
         # other kd beyond KL divergence
@@ -253,46 +254,40 @@ class LangevinSampler(nn.Module):
 
         loss = self.gamma * loss_cls + self.alpha * loss_div + self.beta * loss_kd
 
-        print(loss)
+        grad_diff = torch.autograd.grad(loss, true_input, allow_unused=True)[0]#, retain_graph=True)[0]
 
-        grad_diff = torch.autograd.grad(loss, input, allow_unused=True)[0]#, retain_graph=True)[0]
-
-        # probs = F.softmax(logit_t, dim=1)
-        # entropy = -torch.sum(probs * torch.log(probs), dim=1).sum()
-        # grad_entropy = torch.autograd.grad(entropy, input, allow_unused=True)[0]
-        return grad_diff.detach() # + grad_entropy.detach()
+        #probs = F.softmax(logit_t, dim=1)
+        #entropy = -torch.sum(probs * torch.log(probs), dim=1).sum()
+        #grad_entropy = torch.autograd.grad(entropy, true_input, allow_unused=True)[0]
+        return grad_diff.detach().clamp_(-0.1, 0.1) #+ 0.1 * grad_entropy.detach().clamp_(-0.1, 0.1)
 
 
-    def step(self, input, s_model, t_model, sample_label,decay=0):
-        if decay!=0:
-            cur_step_size=self.step_size/10
-        else:
-            cur_step_size=self.step_size
+    def step(self, input, s_model, t_model, sample_label):
 
         for i in range(self.n_steps):
             tmp_input = input.clone().requires_grad_()
 
-            # s_output = s_model(tmp_input)
-            # t_output = t_model(tmp_input)
-
-            grad = self.get_grad(tmp_input, s_model, t_model, sample_label).clamp_(-0.1, 0.1)
-
-            import math
-            tmp_input = tmp_input + grad * cur_step_size / 2 + math.sqrt(cur_step_size) * torch.randn(tmp_input.shape).to(self.device).normal_(0, 0.01)
-
             transformed_images = []
-            for img in input:
-                # pil_img = transforms.ToPILImage()(img)
+            for img in tmp_input:
                 transformed_img = self.normalizer(img)
                 transformed_images.append(transformed_img.unsqueeze(0))
 
-            input = torch.cat(transformed_images).to(self.device)
+            tmp_input_norm = torch.cat(transformed_images).to(self.device)
+
+            # s_output = s_model(tmp_input)
+            # t_output = t_model(tmp_input)
+
+            grad = self.get_grad(tmp_input, tmp_input_norm, s_model, t_model, sample_label).clamp_(-0.1, 0.1)
+
+            import math
+            tmp_input = tmp_input + grad * self.step_size / 2 + math.sqrt(self.step_size) * torch.randn(tmp_input.shape).to(self.device).normal_(0, 1e-3)
+            tmp_input.clamp_(0, 1)
 
         return tmp_input
 
 
-def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_class=1000,
-                threshold=0.5, input_size=(64, 3, 32, 32), steps=64, decay=0,device='cuda'):
+def get_samples(t_model, s_model, train_loader, args, class_num=100, sample_num_per_class=1000,
+                threshold=0.5, input_size=(64, 3, 32, 32), steps=64, device='cuda'):
 
     # the final num of samples should be sample_num_per_class * class_num * threshold
     # the output is constructed as a 1-dim array and every element is a tuple (img, label)
@@ -301,7 +296,7 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
     print("Start sampling...")
     s_model.eval()
     t_model.eval()
-    sampler = LangevinSampler(args, n_steps=1, step_size=5e-2, device=device)
+    sampler = LangevinSampler(args, n_steps=1, step_size=1e-2, device=device)
     genrated_data = []
 
     for cls in tqdm(range(class_num)):
@@ -342,15 +337,32 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
                 #"""
                 # debug
                 if _ % 8 == 0:
+
+                    normalizer = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+                    transformed_images = []
+                    for img in input:
+                        # pil_img = transforms.ToPILImage()(img)
+                        transformed_img = normalizer(img)
+                        transformed_images.append(transformed_img.unsqueeze(0))
+                    input_ = torch.cat(transformed_images).to(device)
+
                     with torch.no_grad():
-                        s_output = s_model(input)
-                        t_output = t_model(input)
+                        s_output = s_model(input_)
+                        t_output = t_model(input_)
                         s_out = s_output.softmax(dim=-1)
                         t_out = t_output.softmax(dim=-1)
                         # print(s_output[:1, cls], t_output[:1, cls])
-                        # print(_, s_out[:10, cls], t_out[:10, cls])
+                        print(_, s_out[:10, cls], t_out[:10, cls])
                         # print(_, s_out[:1].argmin(), s_out[:1].min(), t_out[:1].argmax(), t_out[:1].max())
                 #"""
+
+            normalizer = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+            transformed_images = []
+            for img in input:
+                # pil_img = transforms.ToPILImage()(img)
+                transformed_img = normalizer(img)
+                transformed_images.append(transformed_img.unsqueeze(0))
+            input = torch.cat(transformed_images).to(device)
 
             with torch.no_grad():
                 s_output = s_model(input)
@@ -367,7 +379,8 @@ def get_samples(t_model, s_model, train_loader, class_num=100, sample_num_per_cl
                 # TODO (after the first stage): add entropy or some other things to improve quality
                 entropy = -torch.sum(t_out[i] * torch.log(t_out[i]))
                 # print(abs(t_out[i, cls].item() - s_out[i, cls].item()), entropy)
-                sample_pairs.append((0 * abs(t_out[i, cls].item() - s_out[i, cls].item()) + entropy.item(), cnt-input_size[0]+i, input[i]))
+                # sample_pairs.append((0 * abs(t_out[i, cls].item() - s_out[i, cls].item()) + entropy.item(), cnt-input_size[0]+i, input[i]))
+                sample_pairs.append((abs(t_out[i, cls].item() - s_out[i, cls].item()), cnt - input_size[0] + i, input[i]))
 
         sorted_pairs = sorted(sample_pairs, reverse=True)
         sorted_pairs = sorted_pairs[:int(sample_num_per_class * threshold)]

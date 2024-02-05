@@ -295,11 +295,11 @@ def get_cifar100_dataloaders_cls(batch_size=128, num_workers=8):
     data_folder = get_data_folder()
 
     train_transform = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
+        #transforms.RandomCrop(32, padding=4),
+        #transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        #AddGaussianNoise(0., 0.2),
-        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+        AddGaussianNoise(0., 0.2),
+        #transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
     ])
 
     train_set = CIFAR100Instance(root=data_folder,
